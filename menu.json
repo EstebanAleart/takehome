@@ -1,0 +1,8 @@
+[
+  { "nombre": "Margherita", "descripcion": "Salsa de tomate, mozzarella fresca y albahaca", "precio": 8900, "imagen": "pizzas/margherita.webp" },
+  { "nombre": "Pepperoni", "descripcion": "Mozzarella y doble de pepperoni picante", "precio": 10500, "imagen": "pizzas/pepperoni.webp" },
+  { "nombre": "Napolitana", "descripcion": "Tomate, mozzarella, jamón, ajo y aceitunas", "precio": 9900, "imagen": "pizzas/napolitana.webp" },
+  { "nombre": "Cuatro Quesos", "descripcion": "Mozzarella, provolone, roquefort y parmesano", "precio": 11200, "imagen": "pizzas/cuatro-quesos.webp" },
+  { "nombre": "Fugazzeta", "descripcion": "Cebolla, mozzarella y orégano, estilo argentino", "precio": 9500, "imagen": "pizzas/fugazzeta.webp" },
+  { "nombre": "Vegetariana", "descripcion": "Morrón, champiñones, cebolla y aceitunas", "precio": 9800, "imagen": "pizzas/vegetariana.webp" }
+]
