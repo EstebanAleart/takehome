@@ -88,14 +88,17 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
       .step:hover { border-color: var(--ink); background: var(--surface-soft); }
       .q { min-width: 1.4ch; text-align: center; font-weight: 600; }
       .line .sub { min-width: 64px; text-align: right; color: var(--body); font-weight: 500; }
-      .total { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.2rem; margin: 1.1rem 0; }
+      .summary { margin: .5rem 0 0; }
+      .sum-row { display: flex; justify-content: space-between; font-size: 14px; color: var(--body); padding: .22rem 0; }
+      .ship-hint { font-size: 12px; color: var(--rausch); font-weight: 600; margin-top: .3rem; }
+      .total { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.2rem; margin: .8rem 0 1.1rem; border-top: 1px solid var(--hairline-soft); padding-top: .8rem; }
       input { font: inherit; width: 100%; min-height: 48px; padding: .75rem .9rem; border-radius: 10px; border: 1px solid var(--hairline); margin-bottom: .7rem; color: var(--ink); background: #fff; }
       input::placeholder { color: var(--muted); }
       input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(34,34,34,.08); }
-      #submit { width: 100%; min-height: 56px; background: #fff; border: 1px solid #cfd6e0; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: .5rem; }
+      #submit { width: 100%; min-height: 84px; background: #fff; border: 1px solid #cfd6e0; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: .5rem; }
       #submit:hover:not(:disabled) { border-color: #009ee3; background: #f5fbff; }
       #submit:disabled { opacity: .5; cursor: not-allowed; }
-      #submit .mp-mark { height: 30px; }
+      #submit .mp-mark { height: 56px; }
       .mp-mark { height: 22px; width: auto; display: block; flex: none; }
       #status { margin-top: .8rem; text-align: center; min-height: 1.2rem; font-size: 14px; font-weight: 500; }
       #status .ok { color: #00a650; font-weight: 700; }
@@ -167,6 +170,7 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
           <button class="sheet-close" id="cart-close" aria-label="Cerrar">×</button>
         </div>
         <div id="cart-lines"><p class="empty">El carrito está vacío. ¡Agregá tu primera pizza!</p></div>
+        <div class="summary" id="summary"></div>
         <div class="total"><span>Total</span><span id="total">$0</span></div>
         <input id="nombre" placeholder="Tu nombre" autocomplete="name" />
         <input id="email" type="email" placeholder="Tu email" autocomplete="email" />
@@ -191,7 +195,7 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
     </div>
 
     <script>
-      import { addItem, removeItem, total, money, orderPayload } from "../cart.js";
+      import { addItem, removeItem, total, shipping, grandTotal, money, orderPayload, FREE_SHIPPING_FROM } from "../cart.js";
 
       // Pegá acá la URL del Web App de Apps Script (termina en /exec).
       // Vacío = modo demo: lee /menu.json y simula el POST.
@@ -273,10 +277,20 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
             lines.appendChild(row);
           }
         }
-        const t = total(cart), n = [...cart.values()].reduce((a, e) => a + e.qty, 0);
-        document.getElementById("total").textContent = money(t);
+        const sub = total(cart), envio = shipping(cart), grand = grandTotal(cart);
+        const n = [...cart.values()].reduce((a, e) => a + e.qty, 0);
+        const summary = document.getElementById("summary");
+        if (cart.size === 0) {
+          summary.innerHTML = "";
+        } else {
+          summary.innerHTML =
+            `<div class="sum-row"><span>Subtotal</span><span>${money(sub)}</span></div>` +
+            `<div class="sum-row"><span>Envío</span><span>${envio === 0 ? "Gratis" : money(envio)}</span></div>` +
+            (envio > 0 ? `<div class="ship-hint">Agregá ${money(FREE_SHIPPING_FROM - sub)} más para envío gratis</div>` : "");
+        }
+        document.getElementById("total").textContent = money(grand);
         $("fab-count").textContent = n;
-        $("fab-total").textContent = money(t);
+        $("fab-total").textContent = money(grand);
         $("cart-fab").hidden = n === 0;
         validate();
       }
@@ -315,8 +329,7 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
       // Abrir checkout MP simulado
       $("submit").addEventListener("click", () => {
         pending = orderPayload(cart, $("nombre").value.trim(), $("email").value.trim());
-        $("mp-amount").textContent = money(pending.total);
-        resetMpBody();
+        resetMpBody(); // pinta el monto desde pending.total
         backdrop.classList.add("open");
       });
 

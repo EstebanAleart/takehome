@@ -76,6 +76,8 @@ Playwright además de los unitarios que ya están.
   más `total` y timestamp.
 - **`base: /takehome`**: pensado para servirse bajo ese subpath en GitHub Pages.
 - **Menú de 6 pizzas con precios de ejemplo** en pesos argentinos.
+- **Envío**: gratis desde $12.000 de subtotal; abajo de eso, costo fijo de **$1.500**
+  (el monto no estaba en el spec, lo asumí). Se suma al total y se guarda en la orden.
 
 ## Tests
 

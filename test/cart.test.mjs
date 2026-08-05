@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addItem, removeItem, total, orderPayload } from "../src/cart.js";
+import { addItem, removeItem, total, shipping, grandTotal, orderPayload, SHIPPING_COST, FREE_SHIPPING_FROM } from "../src/cart.js";
 
 const M = { nombre: "Margherita", precio: 8900 };
 const P = { nombre: "Pepperoni", precio: 10500 };
@@ -37,16 +37,42 @@ test("removeItem sobre inexistente no rompe", () => {
   assert.equal(total(c), 0);
 });
 
-test("orderPayload aplana items y calcula total", () => {
+test("carrito vacío no cobra envío", () => {
+  const c = new Map();
+  assert.equal(shipping(c), 0);
+  assert.equal(grandTotal(c), 0);
+});
+
+test("subtotal bajo el umbral cobra envío", () => {
+  const c = new Map();
+  addItem(c, M); // 8900 < 12000
+  assert.equal(shipping(c), SHIPPING_COST);
+  assert.equal(grandTotal(c), 8900 + SHIPPING_COST);
+});
+
+test("subtotal en/por encima del umbral es envío gratis", () => {
   const c = new Map();
   addItem(c, M);
-  addItem(c, P);
+  addItem(c, P); // 19400 >= 12000
+  assert.equal(total(c), 19400);
+  assert.equal(shipping(c), 0);
+  assert.equal(grandTotal(c), 19400);
+});
+
+test("el umbral exacto ya es gratis", () => {
+  const c = new Map();
+  addItem(c, { nombre: "Exacta", precio: FREE_SHIPPING_FROM });
+  assert.equal(shipping(c), 0);
+});
+
+test("orderPayload aplana items e incluye subtotal, envío y total", () => {
+  const c = new Map();
+  addItem(c, M); // subtotal 8900 → con envío
   const o = orderPayload(c, "Ana", "ana@mail.com");
   assert.equal(o.nombre, "Ana");
   assert.equal(o.email, "ana@mail.com");
-  assert.equal(o.total, 8900 + 10500);
-  assert.deepEqual(o.items, [
-    { nombre: "Margherita", precio: 8900, qty: 1 },
-    { nombre: "Pepperoni", precio: 10500, qty: 1 },
-  ]);
+  assert.equal(o.subtotal, 8900);
+  assert.equal(o.envio, SHIPPING_COST);
+  assert.equal(o.total, 8900 + SHIPPING_COST);
+  assert.deepEqual(o.items, [{ nombre: "Margherita", precio: 8900, qty: 1 }]);
 });
