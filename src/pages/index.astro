@@ -24,7 +24,7 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
       /* Mobile-first. is:global porque las cards/líneas del carrito se inyectan
          por JS y no reciben el scope de Astro. */
       :root {
-        --rausch: #d7263d; --rausch-active: #b71c30; --rausch-disabled: #f0b8c0;
+        --rausch: #e60023; --rausch-active: #cc001f; --rausch-disabled: #f3b3bd;
         --ink: #2a1c17; --body: #4a3a33; --muted: #8a7368;
         --hairline: #ecdfd6; --hairline-soft: #f2e9e2; --surface-soft: #fbf4ec;
         --canvas: #fffaf4;
@@ -53,12 +53,12 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
       .section-head { font-family: var(--display); font-size: 1.5rem; font-weight: 600; letter-spacing: -.3px; margin: 0 0 1rem; }
 
       /* Menú — masonry estilo Pinterest */
-      .menu { columns: 165px; column-gap: .8rem; }
-      .card { break-inside: avoid; margin: 0 0 .8rem; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(80,40,20,.06); transition: box-shadow .2s, transform .2s; }
-      .card:hover { box-shadow: var(--shadow); transform: translateY(-3px); }
+      .menu { columns: 170px; column-gap: .5rem; }
+      .card { break-inside: avoid; margin: 0 0 .5rem; border-radius: 16px; background: #fff; overflow: hidden; transition: transform .15s; }
+      .card:hover { transform: translateY(-2px); }
       .card .photo { position: relative; background: linear-gradient(135deg, #ffe9d6, #ffd8de); }
       .card .photo img { width: 100%; height: auto; display: block; }
-      .badge-lena { position: absolute; top: .55rem; left: .55rem; background: rgba(255,250,244,.92); color: var(--ink); font-size: 11px; font-weight: 600; padding: .25rem .55rem; border-radius: 9999px; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+      .badge-lena { position: absolute; top: .5rem; left: .5rem; background: #fff; color: var(--ink); font-size: 12px; font-weight: 700; padding: .3rem .6rem; border-radius: 9999px; }
       .card .meta { padding: .7rem .8rem .85rem; }
       .card h3 { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 600; }
       .card .desc { color: var(--muted); font-size: 12.5px; line-height: 1.35; margin: .25rem 0 .65rem; }
@@ -92,9 +92,10 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
       input { font: inherit; width: 100%; min-height: 48px; padding: .75rem .9rem; border-radius: 10px; border: 1px solid var(--hairline); margin-bottom: .7rem; color: var(--ink); background: #fff; }
       input::placeholder { color: var(--muted); }
       input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(34,34,34,.08); }
-      #submit { width: 100%; min-height: 54px; background: #fff; color: var(--ink); border: 1px solid #cfd6e0; border-radius: 12px; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+      #submit { width: 100%; min-height: 56px; background: #fff; border: 1px solid #cfd6e0; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: .5rem; }
       #submit:hover:not(:disabled) { border-color: #009ee3; background: #f5fbff; }
       #submit:disabled { opacity: .5; cursor: not-allowed; }
+      #submit .mp-mark { height: 30px; }
       .mp-mark { height: 22px; width: auto; display: block; flex: none; }
       #status { margin-top: .8rem; text-align: center; min-height: 1.2rem; font-size: 14px; font-weight: 500; }
       #status .ok { color: #00a650; font-weight: 700; }
@@ -169,7 +170,7 @@ const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado
         <div class="total"><span>Total</span><span id="total">$0</span></div>
         <input id="nombre" placeholder="Tu nombre" autocomplete="name" />
         <input id="email" type="email" placeholder="Tu email" autocomplete="email" />
-        <button id="submit" disabled><span>Pagar con</span><Fragment set:html={MP_LOGO} /></button>
+        <button id="submit" disabled><Fragment set:html={MP_LOGO} /></button>
         <div id="status"></div>
       </div>
     </div>
