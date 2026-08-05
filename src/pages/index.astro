@@ -1,0 +1,363 @@
+---
+// Menú de pizzería + carrito client-side + envío de orden a Apps Script.
+// El menú se lee del endpoint de Apps Script (doGet). Si no está configurado
+// o falla, cae a /menu.json bundleado para que la página siempre renderice.
+// Estilo visual: Airbnb design language (canvas blanco, acento Rausch #ff385c,
+// tipografía Inter como sustituto de Cereal, esquinas redondeadas, CTAs pill).
+const raw = import.meta.env.BASE_URL;
+const BASE = raw.endsWith("/") ? raw : raw + "/";
+
+// Logo oficial de Mercado Pago (imagen).
+const MP_LOGO = `<img class="mp-mark" src="${BASE}mercadopago.webp" alt="Mercado Pago" />`;
+---
+
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>La Nonna — Pizzería artesanal a domicilio</title>
+    <meta name="description" content="Pizzas artesanales horneadas a leña. Pedí online en 2 clics y recibí en 30 minutos." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style is:global>
+      /* Mobile-first. is:global porque las cards/líneas del carrito se inyectan
+         por JS y no reciben el scope de Astro. */
+      :root {
+        --rausch: #d7263d; --rausch-active: #b71c30; --rausch-disabled: #f0b8c0;
+        --ink: #2a1c17; --body: #4a3a33; --muted: #8a7368;
+        --hairline: #ecdfd6; --hairline-soft: #f2e9e2; --surface-soft: #fbf4ec;
+        --canvas: #fffaf4;
+        --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+        --shadow: 0 8px 24px rgba(80,40,20,.10), 0 0 0 1px rgba(80,40,20,.04);
+        --pad: 1.25rem;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: 'Inter', -apple-system, system-ui, sans-serif; color: var(--ink); background: var(--canvas); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+      button { font: inherit; cursor: pointer; }
+
+      /* Hero — La Nonna + envío al lado de la imagen */
+      .hero { max-width: 1200px; margin-inline: auto; padding: 1.5rem var(--pad) 1rem; display: grid; gap: 1.5rem; align-items: center; }
+      .hero-text { order: 2; }
+      .hero-art { order: 1; aspect-ratio: 16/11; border-radius: 20px; box-shadow: var(--shadow); background: var(--surface-soft) center/cover no-repeat; }
+      .brand { font-family: var(--display); font-weight: 700; font-size: 2rem; color: var(--rausch); letter-spacing: -.5px; line-height: 1; margin-bottom: .6rem; }
+      .hero h1 { font-family: var(--display); font-size: clamp(1.7rem, 6.5vw, 2.5rem); font-weight: 600; letter-spacing: -.5px; line-height: 1.12; margin: 0; }
+      .hero h1 span { color: var(--rausch); }
+      .hero p { font-size: 1rem; color: var(--body); margin: .8rem 0 1.1rem; }
+      .pills { display: flex; flex-wrap: wrap; gap: .5rem; }
+      .pill { background: var(--surface-soft); border: 1px solid var(--hairline); border-radius: 9999px; padding: .45rem .85rem; font-size: 13px; font-weight: 500; color: var(--body); }
+      .ship { display: inline-flex; margin-top: 1rem; background: color-mix(in srgb, var(--rausch) 12%, transparent); color: var(--rausch); font-weight: 600; font-size: 13px; padding: .5rem .9rem; border-radius: 9999px; }
+
+      /* Layout — menú a todo el ancho; el carrito vive en un modal */
+      main { max-width: 1200px; margin-inline: auto; padding: .5rem var(--pad) 5rem; }
+      .section-head { font-family: var(--display); font-size: 1.5rem; font-weight: 600; letter-spacing: -.3px; margin: 0 0 1rem; }
+
+      /* Menú — masonry estilo Pinterest */
+      .menu { columns: 165px; column-gap: .8rem; }
+      .card { break-inside: avoid; margin: 0 0 .8rem; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(80,40,20,.06); transition: box-shadow .2s, transform .2s; }
+      .card:hover { box-shadow: var(--shadow); transform: translateY(-3px); }
+      .card .photo { position: relative; background: linear-gradient(135deg, #ffe9d6, #ffd8de); }
+      .card .photo img { width: 100%; height: auto; display: block; }
+      .badge-lena { position: absolute; top: .55rem; left: .55rem; background: rgba(255,250,244,.92); color: var(--ink); font-size: 11px; font-weight: 600; padding: .25rem .55rem; border-radius: 9999px; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+      .card .meta { padding: .7rem .8rem .85rem; }
+      .card h3 { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 600; }
+      .card .desc { color: var(--muted); font-size: 12.5px; line-height: 1.35; margin: .25rem 0 .65rem; }
+      .card .row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+      .price { font-weight: 700; font-size: 15px; white-space: nowrap; }
+      .add { background: var(--rausch); color: #fff; border: 0; border-radius: 9999px; padding: .45rem .9rem; font-size: 13px; font-weight: 600; }
+      .add:hover { background: var(--rausch-active); }
+      .add:active { transform: scale(.96); }
+
+      /* Botón flotante del carrito */
+      .cart-fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 40; display: inline-flex; align-items: center; gap: .55rem; background: var(--rausch); color: #fff; border: 0; border-radius: 9999px; padding: .8rem 1.2rem; font-weight: 700; font-size: 15px; box-shadow: 0 8px 24px rgba(215,38,61,.35); }
+      .cart-fab:hover { background: var(--rausch-active); }
+      .fab-count { background: rgba(255,255,255,.28); border-radius: 9999px; min-width: 22px; height: 22px; display: inline-grid; place-items: center; font-size: 13px; padding: 0 .3rem; }
+      .fab-total { font-variant-numeric: tabular-nums; }
+
+      /* Carrito (sheet dentro del modal) */
+      .sheet { background: var(--canvas); border-radius: 18px; width: 100%; max-width: 440px; padding: 1.25rem; box-shadow: var(--shadow); max-height: 88vh; overflow-y: auto; }
+      .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: .8rem; }
+      .sheet-head h2 { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 600; }
+      .sheet-close { background: transparent; border: 0; font-size: 1.8rem; line-height: 1; color: var(--muted); width: 36px; height: 36px; border-radius: 9999px; }
+      .sheet-close:hover { background: var(--surface-soft); color: var(--ink); }
+      .empty { color: var(--muted); font-size: 14px; }
+      .line { display: flex; align-items: center; gap: .5rem; padding: .7rem 0; border-bottom: 1px solid var(--hairline-soft); font-size: 14px; }
+      .line .name { flex: 1; font-weight: 500; }
+      .line .qty { display: flex; align-items: center; gap: .4rem; }
+      .step { width: 32px; height: 32px; border-radius: 9999px; border: 1px solid var(--hairline); background: #fff; color: var(--ink); font-size: 18px; line-height: 1; display: grid; place-items: center; }
+      .step:hover { border-color: var(--ink); background: var(--surface-soft); }
+      .q { min-width: 1.4ch; text-align: center; font-weight: 600; }
+      .line .sub { min-width: 64px; text-align: right; color: var(--body); font-weight: 500; }
+      .total { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 1.2rem; margin: 1.1rem 0; }
+      input { font: inherit; width: 100%; min-height: 48px; padding: .75rem .9rem; border-radius: 10px; border: 1px solid var(--hairline); margin-bottom: .7rem; color: var(--ink); background: #fff; }
+      input::placeholder { color: var(--muted); }
+      input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(34,34,34,.08); }
+      #submit { width: 100%; min-height: 54px; background: #fff; color: var(--ink); border: 1px solid #cfd6e0; border-radius: 12px; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+      #submit:hover:not(:disabled) { border-color: #009ee3; background: #f5fbff; }
+      #submit:disabled { opacity: .5; cursor: not-allowed; }
+      .mp-mark { height: 22px; width: auto; display: block; flex: none; }
+      #status { margin-top: .8rem; text-align: center; min-height: 1.2rem; font-size: 14px; font-weight: 500; }
+      #status .ok { color: #00a650; font-weight: 700; }
+
+      footer { border-top: 1px solid var(--hairline); padding: 1.5rem var(--pad); color: var(--muted); font-size: 12px; text-align: center; }
+
+      /* Checkout Mercado Pago (simulado) */
+      .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; place-items: center; padding: 1rem; z-index: 50; }
+      .backdrop.open { display: grid; }
+      #mp-backdrop { z-index: 60; }
+      .mp { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: var(--shadow); }
+      .mp-head { background: #fff; border-bottom: 1px solid var(--hairline); padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+      .mp-logo { display: flex; align-items: center; }
+      .mp-logo .mp-mark { height: 26px; }
+      .mp-sim { font-size: 10px; font-weight: 700; color: #009ee3; background: #e6f4fb; padding: .2rem .5rem; border-radius: 9999px; letter-spacing: .5px; }
+      .mp-body { padding: 1.5rem 1.25rem; text-align: center; }
+      .mp-body .muted { color: var(--muted); font-size: 14px; margin: 0; }
+      .mp .amount { font-size: 2.2rem; font-weight: 800; margin: .3rem 0 1.2rem; }
+      .mp .pay { width: 100%; min-height: 52px; background: #009ee3; color: #fff; border: 0; border-radius: 10px; font-weight: 700; font-size: 16px; }
+      .mp .pay:hover { background: #008fce; }
+      .mp .cancel { width: 100%; min-height: 44px; background: transparent; color: var(--muted); border: 0; margin-top: .4rem; font-weight: 500; }
+      .spinner { width: 42px; height: 42px; margin: 1rem auto; border: 4px solid #e3f3fb; border-top-color: #009ee3; border-radius: 50%; animation: spin .8s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .approved { font-size: 3rem; color: #00a650; line-height: 1; }
+
+      /* ≥720px: hero 2-col, menú 3-col */
+      @media (min-width: 720px) {
+        .hero { grid-template-columns: 1fr 1.05fr; gap: 2.5rem; padding: 2.5rem var(--pad); }
+        .hero-text { order: 1; }
+        .hero-art { order: 2; aspect-ratio: 4/3; }
+        .brand { font-size: 2.4rem; }
+        .hero h1 { font-size: clamp(2.2rem, 3.6vw, 2.9rem); }
+      }
+    </style>
+  </head>
+  <body data-base={BASE}>
+    <section class="hero">
+      <div class="hero-text">
+        <div class="brand">La Nonna</div>
+        <h1>Pizza artesanal, <span>horneada a leña</span>, en tu puerta.</h1>
+        <p>Masa de fermentación lenta de 48 horas e ingredientes que cambian con la estación. Pedí en 2 clics y recibí en 30 minutos.</p>
+        <div class="pills">
+          <span class="pill">Horno a leña</span>
+          <span class="pill">30 min promedio</span>
+          <span class="pill">Ingredientes de estación</span>
+        </div>
+        <div class="ship">Envío gratis desde $12.000</div>
+      </div>
+      <div class="hero-art" style={`background-image: url(${BASE}hero.webp)`} role="img" aria-label="Pizza saliendo del horno a leña"></div>
+    </section>
+
+    <main>
+      <h2 class="section-head">Nuestras pizzas</h2>
+      <div class="menu" id="menu"><p class="empty">Cargando menú…</p></div>
+    </main>
+
+    <!-- Botón flotante que abre el carrito -->
+    <button class="cart-fab" id="cart-fab" hidden>
+      <span>Ver pedido</span>
+      <span class="fab-count" id="fab-count">0</span>
+      <span class="fab-total" id="fab-total">$0</span>
+    </button>
+
+    <!-- Carrito en modal (sheet) -->
+    <div class="backdrop" id="cart-backdrop" role="dialog" aria-modal="true" aria-label="Tu pedido">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>Tu pedido</h2>
+          <button class="sheet-close" id="cart-close" aria-label="Cerrar">×</button>
+        </div>
+        <div id="cart-lines"><p class="empty">El carrito está vacío. ¡Agregá tu primera pizza!</p></div>
+        <div class="total"><span>Total</span><span id="total">$0</span></div>
+        <input id="nombre" placeholder="Tu nombre" autocomplete="name" />
+        <input id="email" type="email" placeholder="Tu email" autocomplete="email" />
+        <button id="submit" disabled><span>Pagar con</span><Fragment set:html={MP_LOGO} /></button>
+        <div id="status"></div>
+      </div>
+    </div>
+
+    <footer>© 2026 La Nonna · Pizzería artesanal · Masa madre, horno a leña, ingredientes de estación</footer>
+
+    <!-- Checkout simulado estilo Mercado Pago (sin API ni cargo real). -->
+    <div class="backdrop" id="mp-backdrop" role="dialog" aria-modal="true" aria-label="Pago con Mercado Pago">
+      <div class="mp">
+        <div class="mp-head"><span class="mp-logo"><Fragment set:html={MP_LOGO} />Mercado Pago</span><span class="mp-sim">SIMULADO</span></div>
+        <div class="mp-body" id="mp-body">
+          <p class="muted">Vas a pagar tu pedido en La Nonna</p>
+          <div class="amount" id="mp-amount">$0</div>
+          <button class="pay" id="mp-pay">Pagar</button>
+          <button class="cancel" id="mp-cancel">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      import { addItem, removeItem, total, money, orderPayload } from "../cart.js";
+
+      // Pegá acá la URL del Web App de Apps Script (termina en /exec).
+      // Vacío = modo demo: lee /menu.json y simula el POST.
+      const ENDPOINT = "";
+
+      const raw = document.body.dataset.base || "/";
+      const BASE = raw.endsWith("/") ? raw : raw + "/";
+      const cart = new Map(); // nombre -> { producto, qty }
+
+      async function loadMenu() {
+        try {
+          if (!ENDPOINT) throw new Error("demo");
+          const r = await fetch(ENDPOINT);
+          if (!r.ok) throw new Error(r.status);
+          return await r.json();
+        } catch {
+          return (await fetch(BASE + "menu.json")).json();
+        }
+      }
+
+      function renderMenu(items) {
+        const el = document.getElementById("menu");
+        el.innerHTML = "";
+        items.forEach((p) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="photo"></div>
+            <div class="meta">
+              <div class="row"><h3></h3></div>
+              <div class="desc"></div>
+              <div class="row"><span class="price"></span><button class="add">Agregar</button></div>
+            </div>`;
+          // Si la hoja trae "imagen" (relativa o URL), la mostramos como <img> lazy.
+          const photo = card.querySelector(".photo");
+          if (p.imagen) {
+            const src = /^https?:/.test(p.imagen) ? p.imagen : BASE + p.imagen;
+            const img = document.createElement("img");
+            img.src = src; img.alt = p.nombre; img.loading = "lazy";
+            photo.appendChild(img);
+          }
+          const badge = document.createElement("span");
+          badge.className = "badge-lena";
+          badge.textContent = "A la leña";
+          photo.appendChild(badge);
+          card.querySelector("h3").textContent = p.nombre;
+          card.querySelector(".desc").textContent = p.descripcion;
+          card.querySelector(".price").textContent = money(p.precio);
+          card.querySelector(".add").addEventListener("click", () => add(p));
+          el.appendChild(card);
+        });
+      }
+
+      const add = p => { addItem(cart, p); renderCart(); };
+      const remove = nombre => { removeItem(cart, nombre); renderCart(); };
+
+      function renderCart() {
+        const lines = document.getElementById("cart-lines");
+        lines.innerHTML = "";
+        if (cart.size === 0) {
+          lines.innerHTML = '<p class="empty">El carrito está vacío. ¡Agregá tu primera pizza!</p>';
+        } else {
+          for (const { producto, qty } of cart.values()) {
+            const row = document.createElement("div");
+            row.className = "line";
+            row.innerHTML = `
+              <span class="name"></span>
+              <span class="qty">
+                <button class="step minus" aria-label="Quitar uno">−</button>
+                <span class="q"></span>
+                <button class="step plus" aria-label="Agregar uno">+</button>
+              </span>
+              <span class="sub"></span>`;
+            row.querySelector(".name").textContent = producto.nombre;
+            row.querySelector(".q").textContent = qty;
+            row.querySelector(".sub").textContent = money(producto.precio * qty);
+            row.querySelector(".minus").addEventListener("click", () => remove(producto.nombre));
+            row.querySelector(".plus").addEventListener("click", () => add(producto));
+            lines.appendChild(row);
+          }
+        }
+        const t = total(cart), n = [...cart.values()].reduce((a, e) => a + e.qty, 0);
+        document.getElementById("total").textContent = money(t);
+        $("fab-count").textContent = n;
+        $("fab-total").textContent = money(t);
+        $("cart-fab").hidden = n === 0;
+        validate();
+      }
+
+      const $ = id => document.getElementById(id);
+      const emailOk = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      function validate() {
+        $("submit").disabled = !(cart.size && $("nombre").value.trim() && emailOk($("email").value));
+      }
+      $("nombre").addEventListener("input", validate);
+      $("email").addEventListener("input", validate);
+
+      // Abrir/cerrar el carrito en modal
+      const cartBackdrop = $("cart-backdrop");
+      const openCart = () => cartBackdrop.classList.add("open");
+      const closeCart = () => cartBackdrop.classList.remove("open");
+      $("cart-fab").addEventListener("click", openCart);
+      $("cart-close").addEventListener("click", closeCart);
+      cartBackdrop.addEventListener("click", e => { if (e.target === cartBackdrop) closeCart(); });
+
+      // POST de la orden a Apps Script (o log en modo demo).
+      async function sendOrder(order) {
+        if (!ENDPOINT) { console.log("[demo] orden:", order); return; }
+        // text/plain evita el preflight CORS que Apps Script no maneja.
+        await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(order),
+        });
+      }
+
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      const backdrop = $("mp-backdrop");
+      let pending = null; // orden esperando pago
+
+      // Abrir checkout MP simulado
+      $("submit").addEventListener("click", () => {
+        pending = orderPayload(cart, $("nombre").value.trim(), $("email").value.trim());
+        $("mp-amount").textContent = money(pending.total);
+        resetMpBody();
+        backdrop.classList.add("open");
+      });
+
+      function resetMpBody() {
+        $("mp-body").innerHTML = `
+          <p class="muted">Vas a pagar tu pedido en La Nonna</p>
+          <div class="amount">${money(pending.total)}</div>
+          <button class="pay" id="mp-pay">Pagar</button>
+          <button class="cancel" id="mp-cancel">Cancelar</button>`;
+        $("mp-pay").addEventListener("click", pay);
+        $("mp-cancel").addEventListener("click", closeMp);
+      }
+      function closeMp() { backdrop.classList.remove("open"); }
+
+      async function pay() {
+        // Estado "procesando"
+        $("mp-body").innerHTML = `<div class="spinner"></div><p class="muted">Procesando pago…</p>`;
+        await wait(1400);
+        // Pago aprobado (simulado) → completar orden y enviarla
+        const order = { ...pending, metodo: "Mercado Pago", pago: "approved", payment_id: "MP-" + Date.now() };
+        try {
+          await sendOrder(order);
+          $("mp-body").innerHTML = `<div class="approved">✓</div><p class="muted">¡Pago aprobado!</p>`;
+          await wait(900);
+          closeMp();
+          $("status").innerHTML = `<span class="ok">✓ ¡Orden enviada!</span> Gracias ${order.nombre}, te llega en ~30 min.`;
+          cart.clear();
+          $("nombre").value = $("email").value = "";
+          renderCart();
+        } catch (e) {
+          $("mp-body").innerHTML = `<p class="muted">❌ No se pudo procesar el pago.</p>
+            <button class="pay" id="mp-pay">Reintentar</button>
+            <button class="cancel" id="mp-cancel">Cancelar</button>`;
+          $("mp-pay").addEventListener("click", pay);
+          $("mp-cancel").addEventListener("click", closeMp);
+        }
+      }
+
+      // Cerrar tocando el fondo
+      backdrop.addEventListener("click", e => { if (e.target === backdrop) closeMp(); });
+
+      loadMenu().then(renderMenu);
+    </script>
+  </body>
+</html>
